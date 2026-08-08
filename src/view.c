@@ -19,6 +19,7 @@
 
 #include "leafpad.h"
 #include <gdk/gdkkeysyms.h>
+#include <gdk/gdkkeysyms-compat.h>
 #include <string.h>
 
 static gint keyval;
@@ -76,14 +77,18 @@ gint check_text_modification(void)
 	return 0;
 }
 
+/*
+ *  GTK+ 2 let us read GtkTextView's IM context directly to tell whether an
+ *  input method was mid-composition, so that the key handling below would keep
+ *  its hands off. GTK+ 3 seals that member and offers no getter --
+ *  gtk_text_view_im_context_filter_keypress() is not a substitute, since it
+ *  consumes ordinary keystrokes too and would skip the undo bookkeeping at the
+ *  end of cb_key_press_event(). The guard is therefore inert here: Up/Down,
+ *  Return and Tab are handled by Leafpad even while an IME is composing.
+ */
 static gint check_preedit(GtkWidget *view)
 {
-	gint cursor_pos;
-	
-	gtk_im_context_get_preedit_string(
-		GTK_TEXT_VIEW(view)->im_context, NULL, NULL, &cursor_pos);
-	
-	return cursor_pos;
+	return 0;
 }
 
 static gboolean check_selection_bound(GtkTextBuffer *buffer)
@@ -159,7 +164,7 @@ static gboolean cb_key_press_event(GtkWidget *view, GdkEventKey *event)
 				mark, 0, TRUE, 0, pos);
 			if (!(event->state & GDK_SHIFT_MASK)) {
 				gtk_text_buffer_get_iter_at_mark(buffer, &iter, mark);
-				gtk_text_buffer_place_cursor(GTK_TEXT_VIEW(view)->buffer, &iter);
+				gtk_text_buffer_place_cursor(gtk_text_view_get_buffer(GTK_TEXT_VIEW(view)), &iter);
 			}
 			return TRUE;
 		}
@@ -177,11 +182,11 @@ static gboolean cb_key_press_event(GtkWidget *view, GdkEventKey *event)
 		}
 	case GDK_ISO_Left_Tab:
 		if (event->state & GDK_SHIFT_MASK)
-			indent_multi_line_unindent(GTK_TEXT_VIEW(view)->buffer);
-		else if (!check_selection_bound(GTK_TEXT_VIEW(view)->buffer))
+			indent_multi_line_unindent(gtk_text_view_get_buffer(GTK_TEXT_VIEW(view)));
+		else if (!check_selection_bound(gtk_text_view_get_buffer(GTK_TEXT_VIEW(view))))
 			break;
 		else
-			indent_multi_line_indent(GTK_TEXT_VIEW(view)->buffer);
+			indent_multi_line_indent(gtk_text_view_get_buffer(GTK_TEXT_VIEW(view)));
 		return TRUE;
 	}
 	keyval = event->keyval;
@@ -240,18 +245,18 @@ static void cb_modified_changed(GtkTextBuffer *buffer, GtkWidget *view)
 
 void force_call_cb_modified_changed(GtkWidget *view)
 {
-	cb_modified_changed(GTK_TEXT_VIEW(view)->buffer, view);
+	cb_modified_changed(gtk_text_view_get_buffer(GTK_TEXT_VIEW(view)), view);
 }
 
 void force_block_cb_modified_changed(GtkWidget *view)
 {
-	g_signal_handlers_block_by_func(G_OBJECT(GTK_TEXT_VIEW(view)->buffer), 
+	g_signal_handlers_block_by_func(G_OBJECT(gtk_text_view_get_buffer(GTK_TEXT_VIEW(view))), 
 		G_CALLBACK(cb_modified_changed), view);
 }
 
 void force_unblock_cb_modified_changed(GtkWidget *view)
 {
-	g_signal_handlers_unblock_by_func(G_OBJECT(GTK_TEXT_VIEW(view)->buffer), 
+	g_signal_handlers_unblock_by_func(G_OBJECT(gtk_text_view_get_buffer(GTK_TEXT_VIEW(view))), 
 		G_CALLBACK(cb_modified_changed), view);
 }
 /*
@@ -272,10 +277,10 @@ static void cb_mark_changed(GtkTextBuffer *buffer)
 
 static void cb_focus_event(GtkWidget *view, GdkEventFocus *event)
 {
-	if (!gtk_text_buffer_get_selection_bounds(GTK_TEXT_VIEW(view)->buffer, NULL, NULL))
+	if (!gtk_text_buffer_get_selection_bounds(gtk_text_view_get_buffer(GTK_TEXT_VIEW(view)), NULL, NULL))
 		gtk_text_mark_set_visible(
 			gtk_text_buffer_get_selection_bound(
-				GTK_TEXT_VIEW(view)->buffer), !event->in);
+				gtk_text_view_get_buffer(GTK_TEXT_VIEW(view))), !event->in);
 	if (event->in)
 		menu_sensitivity_from_clipboard();
 }

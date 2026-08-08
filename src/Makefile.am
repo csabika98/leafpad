@@ -25,6 +25,6 @@ leafpad_SOURCES = \
 	gtksourceiter.h gtksourceiter.c \
 	i18n.h
 
-leafpad_LDADD    = $(GTK_LIBS) $(GNOMEPRINT_LIBS) $(INTLLIBS)
-leafpad_CFLAGS   = $(GTK_CFLAGS) $(GNOMEPRINT_CFLAGS)
+leafpad_LDADD    = $(GTK_LIBS) $(GTKMACINTEGRATION_LIBS) $(INTLLIBS)
+leafpad_CFLAGS   = $(GTK_CFLAGS) $(GTKMACINTEGRATION_CFLAGS)
 leafpad_CPPFLAGS = -DICONDIR=\"$(datadir)/pixmaps\"

@@ -100,7 +100,8 @@ static void dnd_drag_data_recieved_handler(GtkWidget *widget,
 DV(g_print("DND start!\n"));
 	
 #if GTK_CHECK_VERSION(2, 10, 0)
-	if (g_strcasecmp(gdk_atom_name(context->targets->data),
+	if (g_strcasecmp(gdk_atom_name(
+	    gdk_drag_context_list_targets(context)->data),
 	    "GTK_TEXT_BUFFER_CONTENTS") != 0) {
 #else
 	if (info != TARGET_SELF) {
@@ -134,8 +135,9 @@ DV({
 	g_print("%s\n", selection_data->data);
 });	
 	
-	if (selection_data->data && info == TARGET_URI_LIST) {
-		files = g_strsplit((gchar *)selection_data->data, "\n" , -1);
+	if (gtk_selection_data_get_data(selection_data) && info == TARGET_URI_LIST) {
+		files = g_strsplit(
+			(gchar *)gtk_selection_data_get_data(selection_data), "\n" , -1);
 		while (files[i]) {
 			if (strlen(files[i]) == 0)
 				break;
@@ -171,11 +173,25 @@ DV(g_print(">%s\n", comline));
 		if (info == TARGET_SELF) {
 #endif
 			undo_set_sequency_reserve();
-			context->action = GDK_ACTION_MOVE;
-		} else if (info == TARGET_PLAIN 
-			&& g_utf8_validate((gchar *)selection_data->data, -1, NULL)) {
-			selection_data->type =
-				gdk_atom_intern("UTF8_STRING", FALSE);
+			/* GdkDragContext is opaque in GTK+ 3; ask GDK to set the action. */
+			gdk_drag_status(context, GDK_ACTION_MOVE, time);
+		} else if (info == TARGET_PLAIN
+			&& g_utf8_validate(
+				(gchar *)gtk_selection_data_get_data(selection_data),
+				-1, NULL)) {
+			/*
+			 *  GtkSelectionData has no type setter, so the payload is
+			 *  copied out and put back under the UTF8_STRING type.
+			 */
+			gint length = gtk_selection_data_get_length(selection_data);
+			guchar *data = g_malloc(length + 1);
+			memcpy(data, gtk_selection_data_get_data(selection_data), length);
+			data[length] = '\0';
+			gtk_selection_data_set(selection_data,
+				gdk_atom_intern("UTF8_STRING", FALSE),
+				gtk_selection_data_get_format(selection_data),
+				data, length);
+			g_free(data);
 		}
 	}
 	
@@ -189,7 +205,7 @@ static gboolean dnd_drag_motion_handler(GtkWidget *widget,
 	gchar *name;
 	gboolean flag = FALSE;
 	
-	targets = context->targets;
+	targets = gdk_drag_context_list_targets(context);
 	while (targets) {
 		name = gdk_atom_name(targets->data);
 DV(g_print("%s\n", name));
@@ -213,12 +229,12 @@ DV(g_print("%s\n", name));
 			x, y, &bx, &by);
 		gtk_text_view_get_iter_at_location(GTK_TEXT_VIEW(widget), &iter, bx, by);
 		if (!dnd_mark) {
-			dnd_mark = gtk_text_buffer_create_mark(GTK_TEXT_VIEW(widget)->buffer,
+			dnd_mark = gtk_text_buffer_create_mark(gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget)),
 			    NULL, &iter, TRUE);
 			gtk_text_mark_set_visible(dnd_mark, TRUE);
 		} else
 			gtk_text_mark_set_visible(dnd_mark, FALSE);
-			gtk_text_buffer_move_mark(GTK_TEXT_VIEW(widget)->buffer,
+			gtk_text_buffer_move_mark(gtk_text_view_get_buffer(GTK_TEXT_VIEW(widget)),
 			    dnd_mark, &iter);
 			gtk_text_mark_set_visible(dnd_mark, TRUE);
 	}

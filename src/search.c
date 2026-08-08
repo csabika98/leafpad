@@ -34,7 +34,6 @@
 #include "hlight.h"
 
 #if !GTK_CHECK_VERSION(2, 4, 0)
-#	define gtk_dialog_set_has_separator(Dialog, Setting)
 #endif
 
 static gchar *string_find    = NULL;
@@ -95,11 +94,11 @@ gboolean document_search_real(GtkWidget *textview, gint direction)
 	
 //	if (direction == 0 || !hlight_check_searched())
 	if (direction == 0 || (direction != 2 && !hlight_check_searched()))
-		hlight_searched_strings(GTK_TEXT_VIEW(textview)->buffer, string_find);
+		hlight_searched_strings(gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview)), string_find);
 	
 	gtk_text_mark_set_visible(
 		gtk_text_buffer_get_selection_bound(
-			GTK_TEXT_VIEW(textview)->buffer), FALSE);
+			gtk_text_view_get_buffer(GTK_TEXT_VIEW(textview))), FALSE);
 	
 	gtk_text_buffer_get_iter_at_mark(textbuffer, &iter, gtk_text_buffer_get_insert(textbuffer));
 	if (direction < 0) {
@@ -316,13 +315,12 @@ gint run_dialog_search(GtkWidget *textview, gint mode)
 			GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
 			GTK_STOCK_FIND, GTK_RESPONSE_OK,
 			NULL);
-	gtk_dialog_set_has_separator(GTK_DIALOG(dialog), FALSE);
 	
 	table = gtk_table_new(mode + 2, 2, FALSE);
 	 gtk_table_set_row_spacings(GTK_TABLE(table), 8);
 	 gtk_table_set_col_spacings(GTK_TABLE(table), 8);
 	 gtk_container_set_border_width(GTK_CONTAINER(table), 8);
-	 gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), table, FALSE, FALSE, 0);
+	 gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), table, FALSE, FALSE, 0);
 	label_find = gtk_label_new_with_mnemonic(_("Fi_nd what:"));
 	 gtk_misc_set_alignment(GTK_MISC(label_find), 0, 0.5);
 	 gtk_table_attach_defaults(GTK_TABLE(table), label_find, 0, 1, 0, 1);
@@ -358,12 +356,12 @@ gint run_dialog_search(GtkWidget *textview, gint mode)
 	
 	check_case = gtk_check_button_new_with_mnemonic(_("_Match case"));
 	 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_case), match_case);
-	 g_signal_connect(GTK_OBJECT(check_case), "toggled", G_CALLBACK(toggle_check_case), NULL);
+	 g_signal_connect(G_OBJECT(check_case), "toggled", G_CALLBACK(toggle_check_case), NULL);
 	 gtk_table_attach_defaults (GTK_TABLE(table), check_case, 0, 2, 1 + mode, 2 + mode);
 	if (mode) {
 	check_all = gtk_check_button_new_with_mnemonic(_("Replace _all at once"));
 	 gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(check_all), replace_all);
-	 g_signal_connect(GTK_OBJECT(check_all), "toggled", G_CALLBACK(toggle_check_all), NULL);
+	 g_signal_connect(G_OBJECT(check_all), "toggled", G_CALLBACK(toggle_check_all), NULL);
 	 gtk_table_attach_defaults(GTK_TABLE(table), check_all, 0, 2, 2 + mode, 3 + mode);
 	}
 	gtk_window_set_resizable(GTK_WINDOW(dialog), FALSE);
@@ -417,14 +415,13 @@ void run_dialog_jump_to(GtkWidget *textview)
 		GTK_DIALOG_DESTROY_WITH_PARENT,
 		GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
 		NULL);
-	gtk_dialog_set_has_separator(GTK_DIALOG(dialog), FALSE);
 	button = create_button_with_stock_image(_("_Jump"), GTK_STOCK_JUMP_TO);
-	GTK_WIDGET_SET_FLAGS(button, GTK_CAN_DEFAULT);
+	gtk_widget_set_can_default(button, TRUE);
 	gtk_dialog_add_action_widget(GTK_DIALOG(dialog), button, GTK_RESPONSE_OK);
 	table = gtk_table_new(1, 2, FALSE);
 	 gtk_table_set_col_spacings(GTK_TABLE(table), 8);
 	 gtk_container_set_border_width (GTK_CONTAINER(table), 8);
-	 gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), table, FALSE, FALSE, 0);
+	 gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), table, FALSE, FALSE, 0);
 	label = gtk_label_new_with_mnemonic(_("_Line number:"));
 	spinner_adj = (GtkAdjustment *) gtk_adjustment_new(num, 1, max_num, 1, 1, 0);
 	spinner = gtk_spin_button_new(spinner_adj, 1, 0);

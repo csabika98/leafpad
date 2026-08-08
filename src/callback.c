@@ -219,16 +219,14 @@ void on_edit_select_all(void)
 
 static void activate_quick_find(void)
 {
-	GtkItemFactory *ifactory;
 	static gboolean flag = FALSE;
-	
+
 	if (!flag) {
-		ifactory = gtk_item_factory_from_widget(pub->mw->menubar);
 		gtk_widget_set_sensitive(
-			gtk_item_factory_get_widget(ifactory, "/Search/Find Next"),
+			menu_get_widget("/MenuBar/Search/SearchFindNext"),
 			TRUE);
 		gtk_widget_set_sensitive(
-			gtk_item_factory_get_widget(ifactory, "/Search/Find Previous"),
+			menu_get_widget("/MenuBar/Search/SearchFindPrevious"),
 			TRUE);
 		flag = TRUE;
 	}
@@ -268,24 +266,20 @@ void on_option_font(void)
 
 void on_option_word_wrap(void)
 {
-	GtkItemFactory *ifactory;
 	gboolean state;
-	
-	ifactory = gtk_item_factory_from_widget(pub->mw->menubar);
+
 	state = gtk_check_menu_item_get_active(
-		GTK_CHECK_MENU_ITEM(gtk_item_factory_get_item(ifactory, "/Options/Word Wrap")));
+		GTK_CHECK_MENU_ITEM(menu_get_widget("/MenuBar/Options/OptionsWordWrap")));
 	gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(pub->mw->view),
 		state ? GTK_WRAP_WORD : GTK_WRAP_NONE);
 }
 
 void on_option_line_numbers(void)
 {
-	GtkItemFactory *ifactory;
 	gboolean state;
-	
-	ifactory = gtk_item_factory_from_widget(pub->mw->menubar);
+
 	state = gtk_check_menu_item_get_active(
-		GTK_CHECK_MENU_ITEM(gtk_item_factory_get_item(ifactory, "/Options/Line Numbers")));
+		GTK_CHECK_MENU_ITEM(menu_get_widget("/MenuBar/Options/OptionsLineNumbers")));
 	show_line_numbers(pub->mw->view, state);
 }
 
@@ -301,12 +295,10 @@ void on_option_always_on_top(void)
 
 void on_option_auto_indent(void)
 {
-	GtkItemFactory *ifactory;
 	gboolean state;
-	
-	ifactory = gtk_item_factory_from_widget(pub->mw->menubar);
+
 	state = gtk_check_menu_item_get_active(
-		GTK_CHECK_MENU_ITEM(gtk_item_factory_get_item(ifactory, "/Options/Auto Indent")));
+		GTK_CHECK_MENU_ITEM(menu_get_widget("/MenuBar/Options/OptionsAutoIndent")));
 	indent_set_state(state);
 }
 

@@ -66,7 +66,7 @@ MainWin *create_main_window(void)
 	g_signal_connect_after(G_OBJECT(window), "delete-event",
 		G_CALLBACK(gtk_widget_hide_on_delete), NULL);
 	
-	vbox = gtk_vbox_new(FALSE, 0);
+	vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_container_add(GTK_CONTAINER(window), vbox);
 	
 	menubar = create_menu_bar(window);

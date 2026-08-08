@@ -19,6 +19,7 @@
 
 #include "leafpad.h"
 #include <gdk/gdkkeysyms.h>
+#include <gdk/gdkkeysyms-compat.h>
 
 #ifdef ENABLE_EMACS
 
@@ -55,9 +56,8 @@ static void cb_key_press_event(GtkWidget *view, GdkEventKey *event)
 			break;
 		case GDK_s:
 		case GDK_S:
-			if (GTK_WIDGET_IS_SENSITIVE(gtk_item_factory_get_widget(
-				gtk_item_factory_from_widget(pub->mw->menubar), "/File/Save")
-				))
+			if (gtk_widget_get_sensitive(
+				menu_get_widget("/MenuBar/File/FileSave")))
 				on_file_save();
 			break;
 		case GDK_w:
@@ -126,7 +126,7 @@ static void emacs_key_prefix(void)
 	gtk_widget_set_sensitive(pub->mw->menubar, TRUE);
 }
 
-gboolean check_emacs_key_theme(GtkWindow *window, GtkItemFactory *ifactory)
+gboolean check_emacs_key_theme(GtkWindow *window)
 {
 	GtkAccelGroup *accel_group;
 	GSList *groups;
@@ -159,54 +159,54 @@ gboolean check_emacs_key_theme(GtkWindow *window, GtkItemFactory *ifactory)
 	);
 	
 /*	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/File/New"),
+		menu_get_widget("/MenuBar/File/FileNew"),
 		accel_group, GDK_N, GDK_CONTROL_MASK);
 	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/File/Open..."),
+		menu_get_widget("/MenuBar/File/FileOpen"),
 		accel_group, GDK_O, GDK_CONTROL_MASK);
 	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/File/Save"),
+		menu_get_widget("/MenuBar/File/FileSave"),
 		accel_group, GDK_S, GDK_CONTROL_MASK);
 	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/File/Save As..."),
+		menu_get_widget("/MenuBar/File/FileSaveAs"),
 		accel_group, GDK_S, GDK_SHIFT_MASK | GDK_CONTROL_MASK);
 #ifdef ENABLE_PRINT
 	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/File/Print..."),
+		menu_get_widget("/MenuBar/File/FilePrint"),
 		accel_group, GDK_P, GDK_CONTROL_MASK);
 #endif
 	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Edit/Undo"),
+		menu_get_widget("/MenuBar/Edit/EditUndo"),
 		accel_group, GDK_Z, GDK_CONTROL_MASK);
 */	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Edit/Undo"),
+		menu_get_widget("/MenuBar/Edit/EditUndo"),
 		"activate", accel_group, GDK_underscore, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 /*	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Edit/Select All"),
+		menu_get_widget("/MenuBar/Edit/EditSelectAll"),
 		accel_group, GDK_A, GDK_CONTROL_MASK);
 	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Find..."),
+		menu_get_widget("/MenuBar/Search/SearchFind"),
 		accel_group, GDK_F, GDK_CONTROL_MASK);
 */	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Find..."),
+		menu_get_widget("/MenuBar/Search/SearchFind"),
 		"activate", accel_group, GDK_S, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 /*	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Find Next"),
+		menu_get_widget("/MenuBar/Search/SearchFindNext"),
 		"activate", accel_group, GDK_S, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 */	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Find Previous"),
+		menu_get_widget("/MenuBar/Search/SearchFindPrevious"),
 		"activate", accel_group, GDK_R, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
 /*	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Replace..."),
+		menu_get_widget("/MenuBar/Search/SearchReplace"),
 		accel_group, GDK_H, GDK_CONTROL_MASK);
 */	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Replace..."),
+		menu_get_widget("/MenuBar/Search/SearchReplace"),
 		"activate", accel_group, GDK_percent, GDK_MOD1_MASK, GTK_ACCEL_VISIBLE);
 /*	gtk_widget_remove_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Jump To..."),
+		menu_get_widget("/MenuBar/Search/SearchJumpTo"),
 		accel_group, GDK_J, GDK_CONTROL_MASK);
 */	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Jump To..."),
+		menu_get_widget("/MenuBar/Search/SearchJumpTo"),
 		"activate", accel_group, GDK_G, GDK_MOD1_MASK, GTK_ACCEL_VISIBLE);
 	
 	gtk_accel_group_connect(

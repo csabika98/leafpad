@@ -110,9 +110,8 @@ static void display_credits_dialog(GtkWidget *button, Credits *credits)
 		NULL);
 	gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_CLOSE);
 #	if GTK_CHECK_VERSION(2, 4, 0)
-	gtk_dialog_set_has_separator(GTK_DIALOG(dialog), FALSE);
 	gtk_container_set_border_width(GTK_CONTAINER(dialog), 5);
-	gtk_box_set_spacing(GTK_BOX(GTK_DIALOG(dialog)->vbox), 2);
+	gtk_box_set_spacing(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), 2);
 #	endif
 	
 	credits->dialog = dialog;
@@ -130,7 +129,7 @@ static void display_credits_dialog(GtkWidget *button, Credits *credits)
 #	else
 	gtk_container_set_border_width(GTK_CONTAINER(notebook), 8);
 #	endif
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox),
+	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))),
 		notebook, TRUE, TRUE, 0);
 	if (credits->authors != NULL)
 		add_credits_page(notebook,
@@ -180,9 +179,8 @@ static GtkWidget *my_gtk_about_new(
 	
 	dialog = gtk_dialog_new();
 #	if GTK_CHECK_VERSION(2, 4, 0)
-	gtk_dialog_set_has_separator(GTK_DIALOG(dialog), FALSE);
 	gtk_container_set_border_width(GTK_CONTAINER(dialog), 5);
-	gtk_box_set_spacing(GTK_BOX(GTK_DIALOG(dialog)->vbox), 5);
+	gtk_box_set_spacing(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), 5);
 #	endif
 	gtk_dialog_add_button(GTK_DIALOG(dialog),
 #	if GTK_CHECK_VERSION(2, 4, 0)
@@ -198,10 +196,10 @@ static GtkWidget *my_gtk_about_new(
 #	else
 	button = gtk_button_new_with_mnemonic(_("_Credits"));
 #	endif
-	gtk_box_pack_end(GTK_BOX(GTK_DIALOG(dialog)->action_area),
+	gtk_box_pack_end(GTK_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog))),
 		button, FALSE, TRUE, 0);
 	gtk_button_box_set_child_secondary(
-		GTK_BUTTON_BOX(GTK_DIALOG(dialog)->action_area), button, TRUE);
+		GTK_BUTTON_BOX(gtk_dialog_get_action_area(GTK_DIALOG(dialog))), button, TRUE);
 	g_signal_connect(button, "clicked",
 		G_CALLBACK(display_credits_dialog), credits);
 	gtk_widget_show(button);
@@ -210,13 +208,13 @@ static GtkWidget *my_gtk_about_new(
 	gtk_window_set_title(GTK_WINDOW(dialog), title);
 	g_free(title);
 	
-	vbox = gtk_vbox_new(FALSE, 8);
+	vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
 #	if GTK_CHECK_VERSION(2, 4, 0)
 	gtk_container_set_border_width(GTK_CONTAINER(vbox), 5);
 #	else
 	gtk_container_set_border_width(GTK_CONTAINER(vbox), 8);
 #	endif
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), vbox, TRUE, TRUE, 0);
+	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), vbox, TRUE, TRUE, 0);
 	
 	logo_image = gtk_image_new();
 	gtk_image_set_from_pixbuf(GTK_IMAGE(logo_image), logo_pixbuf);

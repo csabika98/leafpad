@@ -20,6 +20,7 @@
 #ifndef _MENU_H
 #define _MENU_H
 
+GtkWidget *menu_get_widget(const gchar *path);
 void menu_sensitivity_from_modified_flag(gboolean is_text_modified);
 void menu_sensitivity_from_selection_bound(gboolean is_bound_exist);
 //void menu_sensitivity_from_clipboard(gboolean is_clipboard_exist);

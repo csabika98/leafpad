@@ -21,7 +21,6 @@
 #include <string.h>
 
 #ifndef ENABLE_CHOOSER
-#	define gtk_dialog_set_has_separator(Dialog, Setting)
 #endif
 
 #define DEFAULT_ITEM_NUM 2
@@ -34,9 +33,9 @@ static gchar *lineend_str[] = {
 	"CR"
 };
 
-static void cb_select_lineend(GtkOptionMenu *option_menu, FileInfo *selected_fi)
+static void cb_select_lineend(GtkComboBox *combo, FileInfo *selected_fi)
 {
-	switch (gtk_option_menu_get_history(option_menu)) {
+	switch (gtk_combo_box_get_active(combo)) {
 	case 1:
 		selected_fi->lineend = CR+LF;
 		break;
@@ -50,23 +49,16 @@ static void cb_select_lineend(GtkOptionMenu *option_menu, FileInfo *selected_fi)
 
 static GtkWidget *create_lineend_menu(FileInfo *selected_fi)
 {
-	GtkWidget *option_menu;
-	GtkWidget *menu;
-	GtkWidget *menu_item;
+	GtkWidget *combo;
 	gint i;
-	
-	option_menu = gtk_option_menu_new();
-	menu = gtk_menu_new();
-	for (i = 0; i <= 2; i++) {
-		menu_item = gtk_menu_item_new_with_label(lineend_str[i]);
-		gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
-		gtk_widget_show(menu_item); // <- required for width adjustment
-	}
-	gtk_option_menu_set_menu(GTK_OPTION_MENU(option_menu), menu);
-	
-	g_signal_connect(G_OBJECT(option_menu), "changed",
+
+	combo = gtk_combo_box_text_new();
+	for (i = 0; i <= 2; i++)
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), lineend_str[i]);
+
+	g_signal_connect(G_OBJECT(combo), "changed",
 		G_CALLBACK(cb_select_lineend), selected_fi);
-	
+
 	i = 0;
 	switch (selected_fi->lineend) {
 	case CR+LF:
@@ -75,9 +67,9 @@ static GtkWidget *create_lineend_menu(FileInfo *selected_fi)
 	case CR:
 		i = 2;
 	}
-	gtk_option_menu_set_history(GTK_OPTION_MENU(option_menu), i);
-	
-	return option_menu;
+	gtk_combo_box_set_active(GTK_COMBO_BOX(combo), i);
+
+	return combo;
 }
 
 typedef struct {
@@ -120,31 +112,48 @@ static void toggle_sensitivity(GtkWidget *entry)
 		strlen(gtk_entry_get_text(GTK_ENTRY(entry))) ? TRUE : FALSE);
 }
 
-static GtkWidget *menu_item_manual_charset;
-static GtkWidget *init_menu_item_manual_charset(gchar *manual_charset)
+static GtkWidget *charset_combo = NULL;
+static gint manual_charset_index = -1;
+
+static void cb_select_charset(GtkComboBox *combo, FileInfo *selected_fi);
+
+/*
+ *  The "Other Codeset" row doubles as a label showing the codeset currently in
+ *  use, so it is rewritten in place whenever that changes. GtkComboBoxText has
+ *  no set-text-at-index, hence insert-then-remove; the surrounding block keeps
+ *  that from re-entering cb_select_charset().
+ */
+static void set_manual_charset_item(gchar *manual_charset)
 {
-	static GtkLabel *label;
+	GtkComboBoxText *combo = GTK_COMBO_BOX_TEXT(charset_combo);
 	gchar *str;
-	
+	gint active;
+
 	if (other_codeset_title == NULL)
 		other_codeset_title = _("Other Codeset");
-	
+
 	str = manual_charset
 		? g_strdup_printf("%s (%s)", other_codeset_title, manual_charset)
 		: g_strdup_printf("%s...", other_codeset_title);
-	
-	if (!menu_item_manual_charset) {
-		menu_item_manual_charset = gtk_menu_item_new_with_label(str);
-		label = GTK_LABEL(GTK_BIN(menu_item_manual_charset)->child);
-	} else
-//		gtk_label_set_text(GTK_LABEL(GTK_BIN(menu_item_manual_charset)->child), str);
-		gtk_label_set_text(label, str);
+
+	if (manual_charset_index < 0) {
+		gtk_combo_box_text_append_text(combo, str);
+		manual_charset_index = gtk_tree_model_iter_n_children(
+			gtk_combo_box_get_model(GTK_COMBO_BOX(combo)), NULL) - 1;
+	} else {
+		g_signal_handlers_block_matched(combo, G_SIGNAL_MATCH_FUNC,
+			0, 0, NULL, G_CALLBACK(cb_select_charset), NULL);
+		active = gtk_combo_box_get_active(GTK_COMBO_BOX(combo));
+		gtk_combo_box_text_insert_text(combo, manual_charset_index, str);
+		gtk_combo_box_text_remove(combo, manual_charset_index + 1);
+		gtk_combo_box_set_active(GTK_COMBO_BOX(combo), active);
+		g_signal_handlers_unblock_matched(combo, G_SIGNAL_MATCH_FUNC,
+			0, 0, NULL, G_CALLBACK(cb_select_charset), NULL);
+	}
 	g_free(str);
-	
-	return menu_item_manual_charset;
 }
 
-static gboolean get_manual_charset(GtkOptionMenu *option_menu, FileInfo *selected_fi)
+static gboolean get_manual_charset(GtkComboBox *option_menu, FileInfo *selected_fi)
 {
 	GtkWidget *dialog;
 	GtkWidget *vbox;
@@ -163,9 +172,9 @@ static gboolean get_manual_charset(GtkOptionMenu *option_menu, FileInfo *selecte
 	gtk_dialog_set_default_response(GTK_DIALOG(dialog), GTK_RESPONSE_OK);
 	gtk_window_set_position(GTK_WINDOW(dialog), GTK_WIN_POS_MOUSE);
 	
-	vbox = gtk_vbox_new(FALSE, 0);
+	vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_container_set_border_width(GTK_CONTAINER(vbox), 8);
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox), vbox, FALSE, FALSE, 0);
+	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))), vbox, FALSE, FALSE, 0);
 	
 	label = gtk_label_new_with_mnemonic(_("Code_set:"));
 	gtk_misc_set_alignment(GTK_MISC(label), 0.0, 0.0);
@@ -199,9 +208,9 @@ static gboolean get_manual_charset(GtkOptionMenu *option_menu, FileInfo *selecte
 			selected_fi->charset_flag = TRUE;
 			gtk_widget_destroy(dialog);
 			
-			init_menu_item_manual_charset(selected_fi->charset_flag
+			set_manual_charset_item(selected_fi->charset_flag
 				? selected_fi->charset : NULL);
-			
+
 			return TRUE;
 		}
 	}
@@ -212,13 +221,19 @@ static gboolean get_manual_charset(GtkOptionMenu *option_menu, FileInfo *selecte
 
 gboolean charset_menu_init_flag;
 
-static void cb_select_charset(GtkOptionMenu *option_menu, FileInfo *selected_fi)
+static void cb_select_charset(GtkComboBox *combo, FileInfo *selected_fi)
 {
 	CharsetTable *ctable;
 	static guint index_history = 0, prev_history;
-	
+	gint active;
+
+	/* Unlike GtkOptionMenu, a combo box can have nothing selected. */
+	active = gtk_combo_box_get_active(combo);
+	if (active < 0)
+		return;
+
 	prev_history = index_history;
-	index_history = gtk_option_menu_get_history(option_menu);
+	index_history = active;
 	if (!charset_menu_init_flag) {
 		ctable = get_charset_table();
 		if (index_history < ctable->num + mode) {
@@ -231,45 +246,34 @@ static void cb_select_charset(GtkOptionMenu *option_menu, FileInfo *selected_fi)
 					g_strdup(ctable->charset[index_history - mode]);
 			}
 		} else
-			if (!get_manual_charset(option_menu, selected_fi)) {
+			if (!get_manual_charset(combo, selected_fi)) {
 				index_history = prev_history;
-				gtk_option_menu_set_history(option_menu, index_history);
+				gtk_combo_box_set_active(combo, index_history);
 			}
 	}
 }
 
 static GtkWidget *create_charset_menu(FileInfo *selected_fi)
 {
-	GtkWidget *option_menu;
-	GtkWidget *menu;
-	GtkWidget *menu_item;
+	GtkWidget *combo;
 	CharsetTable *ctable;
 	gint i;
-	
-	option_menu = gtk_option_menu_new();
-	menu = gtk_menu_new();
-	
-	if (mode == OPEN) {
-		menu_item = gtk_menu_item_new_with_label(_("Auto-Detect"));
-		gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
-		gtk_widget_show(menu_item); // <- required for width adjustment
-	}
+
+	combo = gtk_combo_box_text_new();
+	charset_combo = combo;
+	manual_charset_index = -1;
+
+	if (mode == OPEN)
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), _("Auto-Detect"));
 	ctable = get_charset_table();
-	for (i = 0; i < ctable->num; i++) {
-		menu_item = gtk_menu_item_new_with_label(ctable->str[i]);
-		gtk_menu_shell_append(GTK_MENU_SHELL(menu), menu_item);
-		gtk_widget_show(menu_item); // <- required for width adjustment
-	}
-	menu_item_manual_charset = NULL;
-	gtk_menu_shell_append(GTK_MENU_SHELL(menu),
-		init_menu_item_manual_charset(selected_fi->charset_flag
-			? selected_fi->charset : NULL));
-	gtk_widget_show(menu_item_manual_charset); // <- required for width adjustment
-	
+	for (i = 0; i < ctable->num; i++)
+		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(combo), ctable->str[i]);
+
 	charset_menu_init_flag = TRUE;
-	g_signal_connect(G_OBJECT(option_menu), "changed",
+	g_signal_connect(G_OBJECT(combo), "changed",
 		G_CALLBACK(cb_select_charset), selected_fi);
-	gtk_option_menu_set_menu(GTK_OPTION_MENU(option_menu), menu);
+	set_manual_charset_item(selected_fi->charset_flag
+		? selected_fi->charset : NULL);
 	i = 0;
 	if (selected_fi->charset) {
 		do {
@@ -281,15 +285,15 @@ static GtkWidget *create_charset_menu(FileInfo *selected_fi)
 			g_free(selected_fi->charset);
 			selected_fi->charset = NULL;
 		} else if (i == ctable->num && selected_fi->charset_flag == FALSE) {
-			init_menu_item_manual_charset(selected_fi->charset);
+			set_manual_charset_item(selected_fi->charset);
 		}
 		i += mode;
 	}
 	if (mode == SAVE || selected_fi->charset_flag)
-		gtk_option_menu_set_history(GTK_OPTION_MENU(option_menu), i);
+		gtk_combo_box_set_active(GTK_COMBO_BOX(combo), i);
 	charset_menu_init_flag = FALSE;
-	
-	return option_menu;
+
+	return combo;
 }
 
 static GtkWidget *create_file_selector(FileInfo *selected_fi)
@@ -410,7 +414,7 @@ FileInfo *get_fileinfo_from_selector(FileInfo *fi, gint requested_mode)
 			}
 		}
 		gtk_widget_hide(selector);
-	} while (GTK_WIDGET_VISIBLE(selector));
+	} while (gtk_widget_get_visible(selector));
 	
 	if (res != GTK_RESPONSE_OK) {
 		if (selected_fi->charset)
