@@ -24,9 +24,16 @@ optional — configure detects it and falls back cleanly, or pass
 ## Application bundle
 
 ```sh
-macos/build-app.sh
-open Leafpad.app
+macos/build-app.sh --install     # builds, then installs to /Applications
+open /Applications/Leafpad.app
 ```
+
+Without `--install` the bundle is left in the source tree as `Leafpad.app`.
+That copy is covered by `.gitignore`, so `git clean -xdf` removes it and
+moving the checkout breaks anything pointing at it — install it if you intend
+to keep it in the Dock. Both the build and the install replace `Contents`
+rather than the bundle directory, so the Dock and Finder bookmarks that
+resolve to `Leafpad.app` survive a rebuild.
 
 This installs into `Leafpad.app/Contents/Resources`, renders `leafpad.icns`
 from the scalable SVG at sizes up to 1024px, writes an `Info.plist` declaring

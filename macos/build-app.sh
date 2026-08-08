@@ -7,12 +7,30 @@
 # is not something to hand to someone else. What the bundle does buy is a Dock
 # icon, a name, double-click launch and Finder "Open With" association.
 #
-# Usage:  macos/build-app.sh [--prefix /opt/homebrew]
+# Usage:  macos/build-app.sh [--prefix /opt/homebrew] [--install [dir]]
+#
+#   --install   also place the bundle in /Applications (or the given
+#               directory), which is where a Dock entry should point: the
+#               copy in this tree is covered by .gitignore and would be
+#               removed by "git clean -xdf".
 #
 set -euo pipefail
 
 BREW_PREFIX="${BREW_PREFIX:-$(brew --prefix)}"
-if [ "${1:-}" = "--prefix" ]; then BREW_PREFIX="$2"; fi
+INSTALL_DIR=""
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--prefix)  BREW_PREFIX="$2"; shift 2 ;;
+	--install)
+		if [ $# -ge 2 ] && [ "${2#--}" = "$2" ]; then
+			INSTALL_DIR="$2"; shift 2
+		else
+			INSTALL_DIR="/Applications"; shift
+		fi ;;
+	*) echo "unknown option: $1" >&2; exit 2 ;;
+	esac
+done
 
 cd "$(dirname "$0")/.."
 ROOT="$PWD"
@@ -135,11 +153,34 @@ if [ -d "$RES/share/icons/hicolor" ]; then
 		--force --quiet "$RES/share/icons/hicolor" 2>/dev/null || true
 fi
 
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+
 # Refresh LaunchServices so the icon and document types are picked up now
 # rather than whenever it next rescans.
 touch "$APP"
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
-	-f "$APP" 2>/dev/null || true
+"$LSREGISTER" -f "$APP" 2>/dev/null || true
 
 echo "==> done: $APP"
-echo "    open $APP"
+
+# --- optional install --------------------------------------------------------
+if [ -n "$INSTALL_DIR" ]; then
+	DEST="$INSTALL_DIR/Leafpad.app"
+	echo "==> installing to $DEST"
+
+	# Same reasoning as above: replace Contents rather than the bundle
+	# directory, so a Dock entry pointing at $DEST keeps resolving.
+	if pgrep -f "$DEST/Contents/" >/dev/null 2>&1; then
+		echo "    (Leafpad is running from $DEST -- quit it first)" >&2
+		exit 1
+	fi
+	mkdir -p "$DEST"
+	rm -rf "$DEST/Contents"
+	cp -R "$APP/Contents" "$DEST/Contents"
+
+	touch "$DEST"
+	"$LSREGISTER" -f "$DEST" 2>/dev/null || true
+	echo "==> done: $DEST"
+	echo "    open $DEST"
+else
+	echo "    open $APP"
+fi
