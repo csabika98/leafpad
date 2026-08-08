@@ -33,7 +33,10 @@ if [ ! -f configure ]; then
 	autoreconf -fi >/dev/null
 fi
 
-rm -rf "$APP"
+# Replace the contents, not the bundle directory itself. The Dock and Finder
+# hold a bookmark to Leafpad.app; deleting and recreating it changes the inode
+# and leaves them pointing at something that no longer exists.
+rm -rf "$APP/Contents"
 mkdir -p "$APP/Contents/MacOS" "$RES"
 
 echo "==> configure"
