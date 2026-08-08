@@ -299,7 +299,7 @@ gint main(gint argc, gchar **argv)
 #endif
 	
 	pub->mw = create_main_window();
-	
+
 	conf = g_malloc(sizeof(Conf));
 	conf->width       = 600;
 	conf->height      = 400;
@@ -375,7 +375,15 @@ gint main(gint argc, gchar **argv)
 	
 	set_main_window_title();
 //	hlight_apply_all(pub->mw->buffer);
-	
+
+	/*
+	 *  Last: handing the menu bar to Cocoa reshuffles the menu widgets, and
+	 *  doing that before undo_init()/dnd_init() have run trips callbacks
+	 *  that expect a fully built editor.
+	 */
+	macint_init();
+	macint_ready();
+
 	gtk_main();
 	
 	return 0;

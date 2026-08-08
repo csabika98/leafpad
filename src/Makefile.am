@@ -22,6 +22,7 @@ leafpad_SOURCES = \
 	dnd.h dnd.c \
 	utils.h utils.c \
 	emacs.h emacs.c \
+	macint.h macint.c \
 	gtksourceiter.h gtksourceiter.c \
 	i18n.h
 

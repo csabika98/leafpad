@@ -38,49 +38,49 @@ static GtkUIManager *ui_manager = NULL;
 static GtkActionEntry action_entries[] =
 {
 	{ "File",   NULL, N_("/_File") },
-	{ "FileNew",    GTK_STOCK_NEW,     N_("/File/_New"),       "<control>N",
+	{ "FileNew",    GTK_STOCK_NEW,     N_("/File/_New"),       "<Primary>N",
 		NULL, G_CALLBACK(on_file_new) },
-	{ "FileOpen",   GTK_STOCK_OPEN,    N_("/File/_Open..."),   "<control>O",
+	{ "FileOpen",   GTK_STOCK_OPEN,    N_("/File/_Open..."),   "<Primary>O",
 		NULL, G_CALLBACK(on_file_open) },
-	{ "FileSave",   GTK_STOCK_SAVE,    N_("/File/_Save"),      "<control>S",
+	{ "FileSave",   GTK_STOCK_SAVE,    N_("/File/_Save"),      "<Primary>S",
 		NULL, G_CALLBACK(on_file_save) },
-	{ "FileSaveAs", GTK_STOCK_SAVE_AS, N_("/File/Save _As..."), "<shift><control>S",
+	{ "FileSaveAs", GTK_STOCK_SAVE_AS, N_("/File/Save _As..."), "<shift><Primary>S",
 		NULL, G_CALLBACK(on_file_save_as) },
 #ifdef ENABLE_PRINT
 	{ "FilePrintPreview", GTK_STOCK_PRINT_PREVIEW, N_("/File/Print Pre_view"),
-		"<shift><control>P", NULL, G_CALLBACK(on_file_print_preview) },
-	{ "FilePrint",  GTK_STOCK_PRINT,   N_("/File/_Print..."),  "<control>P",
+		"<shift><Primary>P", NULL, G_CALLBACK(on_file_print_preview) },
+	{ "FilePrint",  GTK_STOCK_PRINT,   N_("/File/_Print..."),  "<Primary>P",
 		NULL, G_CALLBACK(on_file_print) },
 #endif
-	{ "FileQuit",   GTK_STOCK_QUIT,    N_("/File/_Quit"),      "<control>Q",
+	{ "FileQuit",   GTK_STOCK_QUIT,    N_("/File/_Quit"),      "<Primary>Q",
 		NULL, G_CALLBACK(on_file_quit) },
 
 	{ "Edit",   NULL, N_("/_Edit") },
-	{ "EditUndo",   GTK_STOCK_UNDO,    N_("/Edit/_Undo"),      "<control>Z",
+	{ "EditUndo",   GTK_STOCK_UNDO,    N_("/Edit/_Undo"),      "<Primary>Z",
 		NULL, G_CALLBACK(on_edit_undo) },
-	{ "EditRedo",   GTK_STOCK_REDO,    N_("/Edit/_Redo"),      "<shift><control>Z",
+	{ "EditRedo",   GTK_STOCK_REDO,    N_("/Edit/_Redo"),      "<shift><Primary>Z",
 		NULL, G_CALLBACK(on_edit_redo) },
-	{ "EditCut",    GTK_STOCK_CUT,     N_("/Edit/Cu_t"),       "<control>X",
+	{ "EditCut",    GTK_STOCK_CUT,     N_("/Edit/Cu_t"),       "<Primary>X",
 		NULL, G_CALLBACK(on_edit_cut) },
-	{ "EditCopy",   GTK_STOCK_COPY,    N_("/Edit/_Copy"),      "<control>C",
+	{ "EditCopy",   GTK_STOCK_COPY,    N_("/Edit/_Copy"),      "<Primary>C",
 		NULL, G_CALLBACK(on_edit_copy) },
-	{ "EditPaste",  GTK_STOCK_PASTE,   N_("/Edit/_Paste"),     "<control>V",
+	{ "EditPaste",  GTK_STOCK_PASTE,   N_("/Edit/_Paste"),     "<Primary>V",
 		NULL, G_CALLBACK(on_edit_paste) },
 	{ "EditDelete", GTK_STOCK_DELETE,  N_("/Edit/_Delete"),    NULL,
 		NULL, G_CALLBACK(on_edit_delete) },
-	{ "EditSelectAll", NULL,           N_("/Edit/Select _All"), "<control>A",
+	{ "EditSelectAll", NULL,           N_("/Edit/Select _All"), "<Primary>A",
 		NULL, G_CALLBACK(on_edit_select_all) },
 
 	{ "Search", NULL, N_("/_Search") },
-	{ "SearchFind", GTK_STOCK_FIND,    N_("/Search/_Find..."), "<control>F",
+	{ "SearchFind", GTK_STOCK_FIND,    N_("/Search/_Find..."), "<Primary>F",
 		NULL, G_CALLBACK(on_search_find) },
-	{ "SearchFindNext", NULL,          N_("/Search/Find _Next"), "<control>G",
+	{ "SearchFindNext", NULL,          N_("/Search/Find _Next"), "<Primary>G",
 		NULL, G_CALLBACK(on_search_find_next) },
-	{ "SearchFindPrevious", NULL,      N_("/Search/Find _Previous"), "<shift><control>G",
+	{ "SearchFindPrevious", NULL,      N_("/Search/Find _Previous"), "<shift><Primary>G",
 		NULL, G_CALLBACK(on_search_find_previous) },
-	{ "SearchReplace", GTK_STOCK_FIND_AND_REPLACE, N_("/Search/_Replace..."), "<control>H",
+	{ "SearchReplace", GTK_STOCK_FIND_AND_REPLACE, N_("/Search/_Replace..."), "<Primary>H",
 		NULL, G_CALLBACK(on_search_replace) },
-	{ "SearchJumpTo", GTK_STOCK_JUMP_TO, N_("/Search/_Jump To..."), "<control>J",
+	{ "SearchJumpTo", GTK_STOCK_JUMP_TO, N_("/Search/_Jump To..."), "<Primary>J",
 		NULL, G_CALLBACK(on_search_jump_to) },
 
 	{ "Options", NULL, N_("/_Options") },
@@ -204,6 +204,7 @@ GtkWidget *create_menu_bar(GtkWidget *window)
 {
 	GtkAccelGroup *accel_group;
 	GtkActionGroup *action_group;
+	GdkModifierType primary;
 	GError *error = NULL;
 
 	action_group = gtk_action_group_new("LeafpadActions");
@@ -223,16 +224,25 @@ GtkWidget *create_menu_bar(GtkWidget *window)
 	accel_group = gtk_ui_manager_get_accel_group(ui_manager);
 	gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
 
-	/* hidden keybinds */
+	/*
+	 *  hidden keybinds
+	 *
+	 *  The primary modifier is Command on the Quartz backend and Control
+	 *  everywhere else, so it is resolved rather than hardcoded -- same as
+	 *  the "<Primary>" accelerators in the action table above.
+	 */
+	primary = gtk_widget_get_modifier_mask(window,
+		GDK_MODIFIER_INTENT_PRIMARY_ACCELERATOR);
+
 	gtk_accel_group_connect(
-		accel_group, GDK_KEY_W, GDK_CONTROL_MASK, 0,
+		accel_group, GDK_KEY_W, primary, 0,
 		g_cclosure_new_swap(G_CALLBACK(on_file_close), NULL, NULL));
 	gtk_accel_group_connect(
-		accel_group, GDK_KEY_T, GDK_CONTROL_MASK, 0,
+		accel_group, GDK_KEY_T, primary, 0,
 		g_cclosure_new_swap(G_CALLBACK(on_option_always_on_top), NULL, NULL));
 	gtk_widget_add_accelerator(
 		menu_get_widget("/MenuBar/Edit/EditRedo"),
-		"activate", accel_group, GDK_KEY_Y, GDK_CONTROL_MASK, 0);
+		"activate", accel_group, GDK_KEY_Y, primary, 0);
 	gtk_widget_add_accelerator(
 		menu_get_widget("/MenuBar/Search/SearchFindNext"),
 		"activate", accel_group, GDK_KEY_F3, 0, 0);
@@ -241,7 +251,7 @@ GtkWidget *create_menu_bar(GtkWidget *window)
 		"activate", accel_group, GDK_KEY_F3, GDK_SHIFT_MASK, 0);
 	gtk_widget_add_accelerator(
 		menu_get_widget("/MenuBar/Search/SearchReplace"),
-		"activate", accel_group, GDK_KEY_R, GDK_CONTROL_MASK, 0);
+		"activate", accel_group, GDK_KEY_R, primary, 0);
 
 	/* initialize sensitivities */
 	gtk_widget_set_sensitive(
