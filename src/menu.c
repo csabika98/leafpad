@@ -166,6 +166,39 @@ static gchar *menu_translate(const gchar *path, gpointer data)
  *  "/MenuBar/Search/SearchFindNext". Replaces the old
  *  gtk_item_factory_get_widget()/get_item() pair.
  */
+/*
+ *  The accelerators below are described the same way as the action table, so
+ *  that "<Primary>" resolves identically -- Command on the Quartz backend,
+ *  Control elsewhere. Building the modifier by hand with
+ *  gtk_widget_get_modifier_mask() is not equivalent: on an unrealized window
+ *  it yields 0, which silently registers the accelerator with no modifier at
+ *  all and swallows the bare keystroke.
+ */
+static void connect_accel_closure(GtkAccelGroup *accel_group,
+	const gchar *accel, GCallback callback)
+{
+	guint key;
+	GdkModifierType mods;
+
+	gtk_accelerator_parse(accel, &key, &mods);
+	g_return_if_fail(key != 0 && mods != 0);
+
+	gtk_accel_group_connect(accel_group, key, mods, 0,
+		g_cclosure_new_swap(callback, NULL, NULL));
+}
+
+static void add_widget_accel(GtkWidget *widget,
+	GtkAccelGroup *accel_group, const gchar *accel)
+{
+	guint key;
+	GdkModifierType mods;
+
+	gtk_accelerator_parse(accel, &key, &mods);
+	g_return_if_fail(key != 0);
+
+	gtk_widget_add_accelerator(widget, "activate", accel_group, key, mods, 0);
+}
+
 GtkWidget *menu_get_widget(const gchar *path)
 {
 	GtkWidget *widget;
@@ -204,7 +237,6 @@ GtkWidget *create_menu_bar(GtkWidget *window)
 {
 	GtkAccelGroup *accel_group;
 	GtkActionGroup *action_group;
-	GdkModifierType primary;
 	GError *error = NULL;
 
 	action_group = gtk_action_group_new("LeafpadActions");
@@ -224,34 +256,19 @@ GtkWidget *create_menu_bar(GtkWidget *window)
 	accel_group = gtk_ui_manager_get_accel_group(ui_manager);
 	gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
 
-	/*
-	 *  hidden keybinds
-	 *
-	 *  The primary modifier is Command on the Quartz backend and Control
-	 *  everywhere else, so it is resolved rather than hardcoded -- same as
-	 *  the "<Primary>" accelerators in the action table above.
-	 */
-	primary = gtk_widget_get_modifier_mask(window,
-		GDK_MODIFIER_INTENT_PRIMARY_ACCELERATOR);
-
-	gtk_accel_group_connect(
-		accel_group, GDK_KEY_W, primary, 0,
-		g_cclosure_new_swap(G_CALLBACK(on_file_close), NULL, NULL));
-	gtk_accel_group_connect(
-		accel_group, GDK_KEY_T, primary, 0,
-		g_cclosure_new_swap(G_CALLBACK(on_option_always_on_top), NULL, NULL));
-	gtk_widget_add_accelerator(
-		menu_get_widget("/MenuBar/Edit/EditRedo"),
-		"activate", accel_group, GDK_KEY_Y, primary, 0);
-	gtk_widget_add_accelerator(
-		menu_get_widget("/MenuBar/Search/SearchFindNext"),
-		"activate", accel_group, GDK_KEY_F3, 0, 0);
-	gtk_widget_add_accelerator(
-		menu_get_widget("/MenuBar/Search/SearchFindPrevious"),
-		"activate", accel_group, GDK_KEY_F3, GDK_SHIFT_MASK, 0);
-	gtk_widget_add_accelerator(
-		menu_get_widget("/MenuBar/Search/SearchReplace"),
-		"activate", accel_group, GDK_KEY_R, primary, 0);
+	/* hidden keybinds */
+	connect_accel_closure(accel_group, "<Primary>w",
+		G_CALLBACK(on_file_close));
+	connect_accel_closure(accel_group, "<Primary>t",
+		G_CALLBACK(on_option_always_on_top));
+	add_widget_accel(menu_get_widget("/MenuBar/Edit/EditRedo"),
+		accel_group, "<Primary>y");
+	add_widget_accel(menu_get_widget("/MenuBar/Search/SearchFindNext"),
+		accel_group, "F3");
+	add_widget_accel(menu_get_widget("/MenuBar/Search/SearchFindPrevious"),
+		accel_group, "<Shift>F3");
+	add_widget_accel(menu_get_widget("/MenuBar/Search/SearchReplace"),
+		accel_group, "<Primary>r");
 
 	/* initialize sensitivities */
 	gtk_widget_set_sensitive(

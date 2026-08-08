@@ -68,6 +68,18 @@ make install >/dev/null
 # launcher below, which sets the environment first.
 mv "$RES/bin/leafpad" "$RES/bin/leafpad-bin"
 
+# File > New and the drag-and-drop handler start further windows with
+# g_spawn_command_line_async("leafpad"), i.e. by PATH name. Inside a bundle
+# that has to become a new instance of the bundle, otherwise it either finds
+# nothing (the spawn error is discarded, so New silently does nothing) or
+# starts a stray unbundled process. The launcher puts this directory on PATH.
+cat > "$RES/bin/leafpad" <<'SHIM'
+#!/bin/bash
+BUNDLE="$(cd "$(dirname "$0")/../../.." && pwd)"
+exec /usr/bin/open -n -a "$BUNDLE" --args "$@"
+SHIM
+chmod +x "$RES/bin/leafpad"
+
 # --- icon --------------------------------------------------------------------
 echo "==> icon"
 ICONSET=$(mktemp -d)/leafpad.iconset
@@ -134,6 +146,8 @@ BUNDLE="$(cd "$(dirname "$0")/../.." && pwd)"
 RES="$BUNDLE/Contents/Resources"
 BREW="__BREW_PREFIX__"
 
+# Resources/bin first: it holds the "leafpad" shim that File > New spawns.
+export PATH="$RES/bin:$BREW/bin:$PATH"
 export XDG_DATA_DIRS="$RES/share:$BREW/share:/usr/local/share:/usr/share"
 export XDG_CONFIG_DIRS="$BREW/etc/xdg:/etc/xdg"
 export GDK_PIXBUF_MODULE_FILE="$BREW/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache"
