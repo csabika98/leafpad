@@ -123,6 +123,7 @@ line_numbers_draw (GtkWidget *widget,
 	gint count;
 	gint layout_width = 0;
 	gint justify_width = 0;
+	gint border_width;
 	gint i;
 //	gchar *str;
 	gchar str [8];  /* we don't expect more than ten million lines */
@@ -220,15 +221,22 @@ DV({g_print("Painting line numbers %d - %d\n",
 	
 	min_number_window_width = calculate_min_number_window_width(widget);
 	if (layout_width > min_number_window_width)
-		gtk_text_view_set_border_window_size (text_view,
-			GTK_TEXT_WINDOW_LEFT, layout_width + margin + submargin);
+		border_width = layout_width + margin + submargin;
 	else {
-//		if ((gtk_text_view_get_border_window_size (text_view, GTK_TEXT_WINDOW_LEFT) - 5) > layout_width) {
-			gtk_text_view_set_border_window_size (text_view,
-				GTK_TEXT_WINDOW_LEFT, min_number_window_width + margin + submargin);
-//		}
+		border_width = min_number_window_width + margin + submargin;
 		justify_width = min_number_window_width - layout_width;
 	}
+
+	/*
+	 *  Resizing a widget from inside its own draw handler is not allowed in
+	 *  GTK+ 3 and leaves the damage bookkeeping inconsistent, so the border
+	 *  window is only touched when its width actually has to change --
+	 *  under GTK+ 2 this ran on every single expose.
+	 */
+	if (gtk_text_view_get_border_window_size (text_view, GTK_TEXT_WINDOW_LEFT)
+	    != border_width)
+		gtk_text_view_set_border_window_size (text_view,
+			GTK_TEXT_WINDOW_LEFT, border_width);
 	
 	pango_layout_set_width (layout, layout_width);
 	pango_layout_set_alignment (layout, PANGO_ALIGN_RIGHT);
@@ -284,6 +292,14 @@ DV({g_print("Painting line numbers %d - %d\n",
 		layout_width + justify_width + margin : 0,
 		0, submargin,
 		height);
+
+	/*
+	 *  cairo_save()/cairo_restore() do not cover the path, so the current
+	 *  point left behind by the cairo_move_to() above would outlive this
+	 *  handler and leak into whatever draws next on the same context. A
+	 *  stray degenerate subpath fills to nothing but strokes as a dot.
+	 */
+	cairo_new_path (cr);
 
 	cairo_restore (cr);
 
