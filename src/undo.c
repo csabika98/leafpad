@@ -19,6 +19,7 @@
 
 #include <gtk/gtk.h>
 #include <gdk/gdkkeysyms.h>
+#include <gdk/gdkkeysyms-compat.h>
 #include "view.h"
 #include "undo.h"
 
@@ -256,7 +257,7 @@ void undo_clear_all(GtkTextBuffer *buffer)
 
 void undo_init(GtkWidget *view, GtkWidget *undo_button, GtkWidget *redo_button)
 {
-	GtkTextBuffer *buffer = GTK_TEXT_VIEW(view)->buffer;
+	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
 	 
 	undo_w = undo_button;
 	redo_w = redo_button;
@@ -291,6 +292,10 @@ void undo_set_sequency_reserve(void)
 
 static void undo_flush_temporal_buffer(GtkTextBuffer *buffer)
 {
+	/* Reachable via "modified-changed" before undo_init() has allocated. */
+	if (!undo_gstr)
+		return;
+
 	if (undo_gstr->len) {
 		undo_append_undo_info(buffer, ui_tmp->command,
 			ui_tmp->start, ui_tmp->end, g_strdup(undo_gstr->str));

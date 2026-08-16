@@ -51,6 +51,7 @@
 #include "dnd.h"
 #include "utils.h"
 #include "emacs.h"
+#include "macint.h"
 #ifdef ENABLE_PRINT
 #	if GTK_CHECK_VERSION(2, 10, 0)
 #		include "gtkprint.h"

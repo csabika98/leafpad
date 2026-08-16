@@ -107,32 +107,43 @@ get_lines (GtkTextView  *text_view,
 	*countp = count;
 }
 
-static gint
-line_numbers_expose (GtkWidget      *widget,
-                     GdkEventExpose *event)
+static gboolean
+line_numbers_draw (GtkWidget *widget,
+                   cairo_t   *cr)
 {
 	GtkTextView *text_view;
 	GdkWindow *win;
-//	GtkStyle *style;
+	GtkStyleContext *context;
+	GdkRGBA color;
 	PangoLayout *layout;
-	PangoAttrList *alist;
-	PangoAttribute *attr;
 	GArray *numbers;
 	GArray *pixels;
+	gdouble clip_x1, clip_y1, clip_x2, clip_y2;
 	gint y1, y2;
 	gint count;
-	gint layout_width;
+	gint layout_width = 0;
 	gint justify_width = 0;
+	gint border_width;
 	gint i;
 //	gchar *str;
 	gchar str [8];  /* we don't expect more than ten million lines */
-	GdkGC *gc;
 	gint height;
-	
-	if (line_number_visible){{{{{	// omit calculation
-	
+
 	text_view = GTK_TEXT_VIEW (widget);
-	
+
+	/* Only paint when the left border window is the one being drawn. */
+	win = gtk_text_view_get_window (text_view, GTK_TEXT_WINDOW_LEFT);
+	if (!win || !gtk_cairo_should_draw_window (cr, win))
+		return FALSE;
+
+	context = gtk_widget_get_style_context (widget);
+
+	cairo_save (cr);
+	gtk_cairo_transform_to_window (cr, widget, win);
+	height = gdk_window_get_height (win);
+
+	if (line_number_visible){{{{{	// omit calculation
+
 	/* See if this expose is on the line numbers window */
 /*	left_win = gtk_text_view_get_window (text_view,
 	                                     GTK_TEXT_WINDOW_LEFT);
@@ -152,17 +163,11 @@ line_numbers_expose (GtkWidget      *widget,
 	else
 		return FALSE;
 */	
-	win = gtk_text_view_get_window (text_view,
-	                                GTK_TEXT_WINDOW_LEFT);
-	if (event->window != win)
-		return FALSE;
-	
-//	style = gtk_style_copy (widget->style);
-//	style = gtk_style_copy (gtk_widget_get_default_style());
-	
-	y1 = event->area.y;
-	y2 = y1 + event->area.height;
-	
+	/* The exposed strip comes from the cairo clip rather than an event area. */
+	cairo_clip_extents (cr, &clip_x1, &clip_y1, &clip_x2, &clip_y2);
+	y1 = (gint) clip_y1;
+	y2 = (gint) clip_y2;
+
 	gtk_text_view_window_to_buffer_coords (text_view,
 	                                       GTK_TEXT_WINDOW_LEFT,
 	                                       0,
@@ -207,7 +212,8 @@ DV({g_print("Painting line numbers %d - %d\n",
 	
 //	str = g_strdup_printf ("%d", gtk_text_buffer_get_line_count(text_view->buffer));
 	g_snprintf (str, sizeof (str),
-			"%d", MAX (99, gtk_text_buffer_get_line_count(text_view->buffer)));
+			"%d", MAX (99, gtk_text_buffer_get_line_count(
+				gtk_text_view_get_buffer(text_view))));
 	pango_layout_set_text (layout, str, -1);
 //	g_free (str);
 	
@@ -215,30 +221,32 @@ DV({g_print("Painting line numbers %d - %d\n",
 	
 	min_number_window_width = calculate_min_number_window_width(widget);
 	if (layout_width > min_number_window_width)
-		gtk_text_view_set_border_window_size (text_view,
-			GTK_TEXT_WINDOW_LEFT, layout_width + margin + submargin);
+		border_width = layout_width + margin + submargin;
 	else {
-//		if ((gtk_text_view_get_border_window_size (text_view, GTK_TEXT_WINDOW_LEFT) - 5) > layout_width) {
-			gtk_text_view_set_border_window_size (text_view,
-				GTK_TEXT_WINDOW_LEFT, min_number_window_width + margin + submargin);
-//		}
+		border_width = min_number_window_width + margin + submargin;
 		justify_width = min_number_window_width - layout_width;
 	}
+
+	/*
+	 *  Resizing a widget from inside its own draw handler is not allowed in
+	 *  GTK+ 3 and leaves the damage bookkeeping inconsistent, so the border
+	 *  window is only touched when its width actually has to change --
+	 *  under GTK+ 2 this ran on every single expose.
+	 */
+	if (gtk_text_view_get_border_window_size (text_view, GTK_TEXT_WINDOW_LEFT)
+	    != border_width)
+		gtk_text_view_set_border_window_size (text_view,
+			GTK_TEXT_WINDOW_LEFT, border_width);
 	
 	pango_layout_set_width (layout, layout_width);
 	pango_layout_set_alignment (layout, PANGO_ALIGN_RIGHT);
 	
-	alist = pango_attr_list_new();
-	attr = pango_attr_foreground_new(
-		widget->style->text_aa->red,
-		widget->style->text_aa->green,
-		widget->style->text_aa->blue);
-	attr->start_index = 0;
-	attr->end_index = G_MAXUINT;
-	pango_attr_list_insert(alist, attr);
-	pango_layout_set_attributes(layout, alist);
-	pango_attr_list_unref(alist);
-	
+	/* GTK3 has no text_aa colour; dim the normal foreground instead. */
+	gtk_style_context_get_color (context,
+		gtk_widget_get_state_flags (widget), &color);
+	cairo_set_source_rgba (cr,
+		color.red, color.green, color.blue, color.alpha * 0.55);
+
 	/* Draw fully internationalized numbers! */
 	
 	i = 0;
@@ -259,20 +267,10 @@ DV({g_print("Painting line numbers %d - %d\n",
 		
 		pango_layout_set_text (layout, str, -1);
 		
-		gtk_paint_layout (widget->style,
-		                  win,
-		                  GTK_WIDGET_STATE (widget),
-		                  FALSE,
-		                  NULL,
-		                  widget,
-		                  NULL,
-#if GTK_CHECK_VERSION(2, 6, 0)  // Is this solution???
-		                  layout_width + justify_width + margin / 2 + 1,
-#else
-		                  layout_width + justify_width + margin / 2,
-#endif
-		                  pos,
-		                  layout);
+		cairo_move_to (cr,
+		               layout_width + justify_width + margin / 2 + 1,
+		               pos);
+		pango_cairo_show_layout (cr, layout);
 //		g_free (str);
 		
 		++i;
@@ -288,17 +286,23 @@ DV({g_print("Painting line numbers %d - %d\n",
 	
 	}}}}}
 	
-	gc = gdk_gc_new(event->window);
-	gdk_gc_set_foreground(gc, widget->style->base);
-	gdk_window_get_geometry(event->window, NULL, NULL, NULL, &height, NULL);
-	gdk_draw_rectangle(event->window, gc, TRUE,
+	/* Gap between the numbers and the text, painted in the view background. */
+	gtk_render_background (context, cr,
 		line_number_visible ?
 		layout_width + justify_width + margin : 0,
 		0, submargin,
 		height);
-	
-	g_object_unref(gc);
-	
+
+	/*
+	 *  cairo_save()/cairo_restore() do not cover the path, so the current
+	 *  point left behind by the cairo_move_to() above would outlive this
+	 *  handler and leak into whatever draws next on the same context. A
+	 *  stray degenerate subpath fills to nothing but strokes as a dot.
+	 */
+	cairo_new_path (cr);
+
+	cairo_restore (cr);
+
 	return FALSE;
 }
 
@@ -321,10 +325,14 @@ void show_line_numbers(GtkWidget *text_view, gboolean visible)
 void linenum_init(GtkWidget *text_view)
 {
 	min_number_window_width = calculate_min_number_window_width(text_view);
-	g_signal_connect(
+	/*
+	 *  Must run _after_ GtkTextView: unlike GTK+ 2's expose, the GTK+ 3 draw
+	 *  handler paints the border windows itself and would cover the numbers.
+	 */
+	g_signal_connect_after(
 		G_OBJECT(text_view),
-		"expose_event",
-		G_CALLBACK(line_numbers_expose),
+		"draw",
+		G_CALLBACK(line_numbers_draw),
 		NULL);
 	show_line_numbers(text_view, FALSE);
 }

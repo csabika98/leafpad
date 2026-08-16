@@ -83,7 +83,7 @@ GtkWidget *create_button_with_stock_image(const gchar *text, const gchar *stock_
 	GtkWidget *label;
 	GtkWidget *align;
 	
-	hbox = gtk_hbox_new(FALSE, 2);
+	hbox = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 2);
 	
 	image = gtk_image_new_from_stock(stock_id, GTK_ICON_SIZE_BUTTON);
 	gtk_box_pack_start(GTK_BOX(hbox), image, FALSE, FALSE, 0);

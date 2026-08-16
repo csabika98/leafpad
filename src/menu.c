@@ -1,17 +1,17 @@
 /*
  *  Leafpad - GTK+ based simple text editor
  *  Copyright (C) 2004-2005 Tarot Osuji
- *  
+ *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
  *  the Free Software Foundation; either version 2 of the License, or
  *  (at your option) any later version.
- *  
+ *
  *  This program is distributed in the hope that it will be useful,
  *  but WITHOUT ANY WARRANTY; without even the implied warranty of
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *  GNU General Public License for more details.
- *  
+ *
  *  You should have received a copy of the GNU General Public License
  *  along with this program; if not, write to the Free Software
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -19,6 +19,7 @@
 
 #include "leafpad.h"
 #include <gdk/gdkkeysyms.h>
+#include <string.h>
 
 static GtkWidget *menu_item_save;
 static GtkWidget *menu_item_cut;
@@ -26,99 +27,189 @@ static GtkWidget *menu_item_copy;
 static GtkWidget *menu_item_paste;
 static GtkWidget *menu_item_delete;
 
-static GtkItemFactoryEntry menu_items[] =
+static GtkUIManager *ui_manager = NULL;
+
+/*
+ *  Action labels are kept as the old GtkItemFactory paths ("/File/_New") so
+ *  that the existing message catalogs keep matching; menu_translate() drops
+ *  everything up to the last '/' of the *translated* string, which is where
+ *  the label proper begins.
+ */
+static GtkActionEntry action_entries[] =
 {
-	{ N_("/_File"), NULL,
-		NULL, 0, "<Branch>" },
-	{ N_("/File/_New"), "<control>N",
-		G_CALLBACK(on_file_new), 0, "<StockItem>", GTK_STOCK_NEW },
-	{ N_("/File/_Open..."), "<control>O",
-		G_CALLBACK(on_file_open), 0, "<StockItem>", GTK_STOCK_OPEN },
-	{ N_("/File/_Save"), "<control>S",
-		G_CALLBACK(on_file_save), 0, "<StockItem>", GTK_STOCK_SAVE },
-	{ N_("/File/Save _As..."), "<shift><control>S",
-		G_CALLBACK(on_file_save_as), 0, "<StockItem>", GTK_STOCK_SAVE_AS },
-	{ "/File/---", NULL,
-		NULL, 0, "<Separator>" },
+	{ "File",   NULL, N_("/_File") },
+	{ "FileNew",    GTK_STOCK_NEW,     N_("/File/_New"),       "<Primary>N",
+		NULL, G_CALLBACK(on_file_new) },
+	{ "FileOpen",   GTK_STOCK_OPEN,    N_("/File/_Open..."),   "<Primary>O",
+		NULL, G_CALLBACK(on_file_open) },
+	{ "FileSave",   GTK_STOCK_SAVE,    N_("/File/_Save"),      "<Primary>S",
+		NULL, G_CALLBACK(on_file_save) },
+	{ "FileSaveAs", GTK_STOCK_SAVE_AS, N_("/File/Save _As..."), "<shift><Primary>S",
+		NULL, G_CALLBACK(on_file_save_as) },
 #ifdef ENABLE_PRINT
-#	if GTK_CHECK_VERSION(2, 10, 0)
-	{ N_("/File/Print Pre_view"), "<shift><control>P",
-		G_CALLBACK(on_file_print_preview), 0, "<StockItem>", GTK_STOCK_PRINT_PREVIEW },
-#	endif
-	{ N_("/File/_Print..."), "<control>P",
-		G_CALLBACK(on_file_print), 0, "<StockItem>", GTK_STOCK_PRINT },
-#	if GTK_CHECK_VERSION(2, 10, 0)
-	{ "/File/---", NULL,
-		NULL, 0, "<Separator>" },
-#	endif
+	{ "FilePrintPreview", GTK_STOCK_PRINT_PREVIEW, N_("/File/Print Pre_view"),
+		"<shift><Primary>P", NULL, G_CALLBACK(on_file_print_preview) },
+	{ "FilePrint",  GTK_STOCK_PRINT,   N_("/File/_Print..."),  "<Primary>P",
+		NULL, G_CALLBACK(on_file_print) },
 #endif
-	{ N_("/File/_Quit"), "<control>Q",
-		G_CALLBACK(on_file_quit), 0, "<StockItem>", GTK_STOCK_QUIT },
-	{ N_("/_Edit"),	 NULL,
-		NULL, 0, "<Branch>" },
-	{ N_("/Edit/_Undo"), "<control>Z",
-		G_CALLBACK(on_edit_undo), 0, "<StockItem>", GTK_STOCK_UNDO },
-	{ N_("/Edit/_Redo"), "<shift><control>Z",
-		G_CALLBACK(on_edit_redo), 0, "<StockItem>", GTK_STOCK_REDO },
-	{ "/Edit/---", NULL,
-		NULL, 0, "<Separator>" },
-	{ N_("/Edit/Cu_t"), "<control>X",
-		G_CALLBACK(on_edit_cut), 0, "<StockItem>", GTK_STOCK_CUT },
-	{ N_("/Edit/_Copy"), "<control>C",
-		G_CALLBACK(on_edit_copy), 0, "<StockItem>", GTK_STOCK_COPY },
-	{ N_("/Edit/_Paste"), "<control>V",
-		G_CALLBACK(on_edit_paste), 0, "<StockItem>", GTK_STOCK_PASTE },
-	{ N_("/Edit/_Delete"), NULL,
-		G_CALLBACK(on_edit_delete), 0, "<StockItem>", GTK_STOCK_DELETE },
-	{ "/Edit/---", NULL,
-		NULL, 0, "<Separator>" },
-	{ N_("/Edit/Select _All"), "<control>A",
-		G_CALLBACK(on_edit_select_all), 0 },
-	{ N_("/_Search"),	 NULL,
-		NULL, 0, "<Branch>" },
-	{ N_("/Search/_Find..."), "<control>F",
-		G_CALLBACK(on_search_find), 0, "<StockItem>", GTK_STOCK_FIND },
-	{ N_("/Search/Find _Next"), "<control>G",
-		G_CALLBACK(on_search_find_next), 0 },
-	{ N_("/Search/Find _Previous"), "<shift><control>G",
-		G_CALLBACK(on_search_find_previous), 0 },
-	{ N_("/Search/_Replace..."), "<control>H",
-		G_CALLBACK(on_search_replace), 0, "<StockItem>", GTK_STOCK_FIND_AND_REPLACE },
-	{ "/Search/---", NULL,
-		NULL, 0, "<Separator>" },
-	{ N_("/Search/_Jump To..."), "<control>J",
-		G_CALLBACK(on_search_jump_to), 0, "<StockItem>", GTK_STOCK_JUMP_TO },
-	{ N_("/_Options"), NULL,
-		NULL, 0, "<Branch>" },
-	{ N_("/Options/_Font..."), NULL,
-		G_CALLBACK(on_option_font), 0, "<StockItem>", GTK_STOCK_SELECT_FONT },
-	{ N_("/Options/_Word Wrap"), NULL,
-		G_CALLBACK(on_option_word_wrap), 0, "<CheckItem>" },
-	{ N_("/Options/_Line Numbers"), NULL,
-		G_CALLBACK(on_option_line_numbers), 0, "<CheckItem>" },
-	{ "/Options/---", NULL,
-		NULL, 0, "<Separator>" },
-	{ N_("/Options/_Auto Indent"), NULL,
-		G_CALLBACK(on_option_auto_indent), 0, "<CheckItem>" },
-	{ N_("/_Help"), NULL,
-		NULL, 0, "<Branch>" },
-	{ N_("/Help/_About"), NULL,
-#if GTK_CHECK_VERSION(2, 6, 0)
-		G_CALLBACK(on_help_about), 0, "<StockItem>", GTK_STOCK_ABOUT },
-#else
-		G_CALLBACK(on_help_about), 0, "<StockItem>", "my-gtk-about" },
-#endif
+	{ "FileQuit",   GTK_STOCK_QUIT,    N_("/File/_Quit"),      "<Primary>Q",
+		NULL, G_CALLBACK(on_file_quit) },
+
+	{ "Edit",   NULL, N_("/_Edit") },
+	{ "EditUndo",   GTK_STOCK_UNDO,    N_("/Edit/_Undo"),      "<Primary>Z",
+		NULL, G_CALLBACK(on_edit_undo) },
+	{ "EditRedo",   GTK_STOCK_REDO,    N_("/Edit/_Redo"),      "<shift><Primary>Z",
+		NULL, G_CALLBACK(on_edit_redo) },
+	{ "EditCut",    GTK_STOCK_CUT,     N_("/Edit/Cu_t"),       "<Primary>X",
+		NULL, G_CALLBACK(on_edit_cut) },
+	{ "EditCopy",   GTK_STOCK_COPY,    N_("/Edit/_Copy"),      "<Primary>C",
+		NULL, G_CALLBACK(on_edit_copy) },
+	{ "EditPaste",  GTK_STOCK_PASTE,   N_("/Edit/_Paste"),     "<Primary>V",
+		NULL, G_CALLBACK(on_edit_paste) },
+	{ "EditDelete", GTK_STOCK_DELETE,  N_("/Edit/_Delete"),    NULL,
+		NULL, G_CALLBACK(on_edit_delete) },
+	{ "EditSelectAll", NULL,           N_("/Edit/Select _All"), "<Primary>A",
+		NULL, G_CALLBACK(on_edit_select_all) },
+
+	{ "Search", NULL, N_("/_Search") },
+	{ "SearchFind", GTK_STOCK_FIND,    N_("/Search/_Find..."), "<Primary>F",
+		NULL, G_CALLBACK(on_search_find) },
+	{ "SearchFindNext", NULL,          N_("/Search/Find _Next"), "<Primary>G",
+		NULL, G_CALLBACK(on_search_find_next) },
+	{ "SearchFindPrevious", NULL,      N_("/Search/Find _Previous"), "<shift><Primary>G",
+		NULL, G_CALLBACK(on_search_find_previous) },
+	{ "SearchReplace", GTK_STOCK_FIND_AND_REPLACE, N_("/Search/_Replace..."), "<Primary>H",
+		NULL, G_CALLBACK(on_search_replace) },
+	{ "SearchJumpTo", GTK_STOCK_JUMP_TO, N_("/Search/_Jump To..."), "<Primary>J",
+		NULL, G_CALLBACK(on_search_jump_to) },
+
+	{ "Options", NULL, N_("/_Options") },
+	{ "OptionsFont", GTK_STOCK_SELECT_FONT, N_("/Options/_Font..."), NULL,
+		NULL, G_CALLBACK(on_option_font) },
+
+	{ "Help",   NULL, N_("/_Help") },
+	{ "HelpAbout",  GTK_STOCK_ABOUT,   N_("/Help/_About"),     NULL,
+		NULL, G_CALLBACK(on_help_about) },
 };
 
-static gint nmenu_items = sizeof(menu_items) / sizeof(GtkItemFactoryEntry);
+static GtkToggleActionEntry toggle_entries[] =
+{
+	{ "OptionsWordWrap", NULL,    N_("/Options/_Word Wrap"),    NULL,
+		NULL, G_CALLBACK(on_option_word_wrap),    FALSE },
+	{ "OptionsLineNumbers", NULL, N_("/Options/_Line Numbers"), NULL,
+		NULL, G_CALLBACK(on_option_line_numbers), FALSE },
+	{ "OptionsAutoIndent", NULL,  N_("/Options/_Auto Indent"),  NULL,
+		NULL, G_CALLBACK(on_option_auto_indent),  FALSE },
+};
+
+static const gchar *ui_description =
+"<ui>"
+"  <menubar name='MenuBar'>"
+"    <menu action='File'>"
+"      <menuitem action='FileNew'/>"
+"      <menuitem action='FileOpen'/>"
+"      <menuitem action='FileSave'/>"
+"      <menuitem action='FileSaveAs'/>"
+"      <separator/>"
+#ifdef ENABLE_PRINT
+"      <menuitem action='FilePrintPreview'/>"
+"      <menuitem action='FilePrint'/>"
+"      <separator/>"
+#endif
+"      <menuitem action='FileQuit'/>"
+"    </menu>"
+"    <menu action='Edit'>"
+"      <menuitem action='EditUndo'/>"
+"      <menuitem action='EditRedo'/>"
+"      <separator/>"
+"      <menuitem action='EditCut'/>"
+"      <menuitem action='EditCopy'/>"
+"      <menuitem action='EditPaste'/>"
+"      <menuitem action='EditDelete'/>"
+"      <separator/>"
+"      <menuitem action='EditSelectAll'/>"
+"    </menu>"
+"    <menu action='Search'>"
+"      <menuitem action='SearchFind'/>"
+"      <menuitem action='SearchFindNext'/>"
+"      <menuitem action='SearchFindPrevious'/>"
+"      <menuitem action='SearchReplace'/>"
+"      <separator/>"
+"      <menuitem action='SearchJumpTo'/>"
+"    </menu>"
+"    <menu action='Options'>"
+"      <menuitem action='OptionsFont'/>"
+"      <menuitem action='OptionsWordWrap'/>"
+"      <menuitem action='OptionsLineNumbers'/>"
+"      <separator/>"
+"      <menuitem action='OptionsAutoIndent'/>"
+"    </menu>"
+"    <menu action='Help'>"
+"      <menuitem action='HelpAbout'/>"
+"    </menu>"
+"  </menubar>"
+"</ui>";
 
 static gchar *menu_translate(const gchar *path, gpointer data)
 {
 	gchar *str;
-	
+	gchar *sep;
+
 	str = (gchar *)_(path);
-	
-	return str;
+	sep = strrchr(str, '/');
+
+	return sep ? sep + 1 : str;
+}
+
+/*
+ *  Look up a menu proxy widget by its GtkUIManager path, e.g.
+ *  "/MenuBar/Search/SearchFindNext". Replaces the old
+ *  gtk_item_factory_get_widget()/get_item() pair.
+ */
+/*
+ *  The accelerators below are described the same way as the action table, so
+ *  that "<Primary>" resolves identically -- Command on the Quartz backend,
+ *  Control elsewhere. Building the modifier by hand with
+ *  gtk_widget_get_modifier_mask() is not equivalent: on an unrealized window
+ *  it yields 0, which silently registers the accelerator with no modifier at
+ *  all and swallows the bare keystroke.
+ */
+static void connect_accel_closure(GtkAccelGroup *accel_group,
+	const gchar *accel, GCallback callback)
+{
+	guint key;
+	GdkModifierType mods;
+
+	gtk_accelerator_parse(accel, &key, &mods);
+	g_return_if_fail(key != 0 && mods != 0);
+
+	gtk_accel_group_connect(accel_group, key, mods, 0,
+		g_cclosure_new_swap(callback, NULL, NULL));
+}
+
+static void add_widget_accel(GtkWidget *widget,
+	GtkAccelGroup *accel_group, const gchar *accel)
+{
+	guint key;
+	GdkModifierType mods;
+
+	gtk_accelerator_parse(accel, &key, &mods);
+	g_return_if_fail(key != 0);
+
+	gtk_widget_add_accelerator(widget, "activate", accel_group, key, mods, 0);
+}
+
+GtkWidget *menu_get_widget(const gchar *path)
+{
+	GtkWidget *widget;
+
+	g_return_val_if_fail(ui_manager != NULL, NULL);
+
+	widget = gtk_ui_manager_get_widget(ui_manager, path);
+	if (!widget)
+		g_warning("menu_get_widget: no widget at '%s'", path);
+
+	return widget;
 }
 
 void menu_sensitivity_from_modified_flag(gboolean is_text_modified)
@@ -145,60 +236,54 @@ void menu_sensitivity_from_clipboard(void)
 GtkWidget *create_menu_bar(GtkWidget *window)
 {
 	GtkAccelGroup *accel_group;
-	GtkItemFactory *ifactory;
-	gboolean flag_emacs = FALSE;
-	
-	gchar *key_theme = NULL;
-	GtkSettings *settings = gtk_settings_get_default();
-	if (settings) {
-		g_object_get(settings, "gtk-key-theme-name", &key_theme, NULL);
-		if (key_theme) {
-			if (!g_ascii_strcasecmp(key_theme, "Emacs"))
-				flag_emacs = TRUE;
-			g_free(key_theme);
-		}
+	GtkActionGroup *action_group;
+	GError *error = NULL;
+
+	action_group = gtk_action_group_new("LeafpadActions");
+	gtk_action_group_set_translate_func(action_group, menu_translate, NULL, NULL);
+	gtk_action_group_add_actions(action_group,
+		action_entries, G_N_ELEMENTS(action_entries), NULL);
+	gtk_action_group_add_toggle_actions(action_group,
+		toggle_entries, G_N_ELEMENTS(toggle_entries), NULL);
+
+	ui_manager = gtk_ui_manager_new();
+	gtk_ui_manager_insert_action_group(ui_manager, action_group, 0);
+	if (!gtk_ui_manager_add_ui_from_string(ui_manager, ui_description, -1, &error)) {
+		g_error("building menus failed: %s", error->message);
+		g_error_free(error);
 	}
-	
-	accel_group = gtk_accel_group_new();
-	ifactory = gtk_item_factory_new(GTK_TYPE_MENU_BAR, "<main>", accel_group);
-	gtk_item_factory_set_translate_func(ifactory, menu_translate, NULL, NULL);
-	gtk_item_factory_create_items(ifactory, nmenu_items, menu_items, NULL);
+
+	accel_group = gtk_ui_manager_get_accel_group(ui_manager);
 	gtk_window_add_accel_group(GTK_WINDOW(window), accel_group);
-	
+
 	/* hidden keybinds */
-	gtk_accel_group_connect(
-		accel_group, GDK_W, GDK_CONTROL_MASK, 0,
-		g_cclosure_new_swap(G_CALLBACK(on_file_close), NULL, NULL));
-	gtk_accel_group_connect(
-		accel_group, GDK_T, GDK_CONTROL_MASK, 0,
-		g_cclosure_new_swap(G_CALLBACK(on_option_always_on_top), NULL, NULL));
-	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Edit/Redo"),
-		"activate", accel_group, GDK_Y, GDK_CONTROL_MASK, 0);
-	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Find Next"),
-		"activate", accel_group, GDK_F3, 0, 0);
-	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Find Previous"),
-		"activate", accel_group, GDK_F3, GDK_SHIFT_MASK, 0);
-	gtk_widget_add_accelerator(
-		gtk_item_factory_get_widget(ifactory, "/Search/Replace..."),
-		"activate", accel_group, GDK_R, GDK_CONTROL_MASK, 0);
-	
+	connect_accel_closure(accel_group, "<Primary>w",
+		G_CALLBACK(on_file_close));
+	connect_accel_closure(accel_group, "<Primary>t",
+		G_CALLBACK(on_option_always_on_top));
+	add_widget_accel(menu_get_widget("/MenuBar/Edit/EditRedo"),
+		accel_group, "<Primary>y");
+	add_widget_accel(menu_get_widget("/MenuBar/Search/SearchFindNext"),
+		accel_group, "F3");
+	add_widget_accel(menu_get_widget("/MenuBar/Search/SearchFindPrevious"),
+		accel_group, "<Shift>F3");
+	add_widget_accel(menu_get_widget("/MenuBar/Search/SearchReplace"),
+		accel_group, "<Primary>r");
+
 	/* initialize sensitivities */
 	gtk_widget_set_sensitive(
-		gtk_item_factory_get_widget(ifactory, "/Search/Find Next"),
+		menu_get_widget("/MenuBar/Search/SearchFindNext"),
 		FALSE);
 	gtk_widget_set_sensitive(
-		gtk_item_factory_get_widget(ifactory, "/Search/Find Previous"),
+		menu_get_widget("/MenuBar/Search/SearchFindPrevious"),
 		FALSE);
-	
-	menu_item_save   = gtk_item_factory_get_widget(ifactory, "/File/Save");
-	menu_item_cut    = gtk_item_factory_get_widget(ifactory, "/Edit/Cut");
-	menu_item_copy   = gtk_item_factory_get_widget(ifactory, "/Edit/Copy");
-	menu_item_paste  = gtk_item_factory_get_widget(ifactory, "/Edit/Paste");
-	menu_item_delete = gtk_item_factory_get_widget(ifactory, "/Edit/Delete");
+
+	menu_item_save   = menu_get_widget("/MenuBar/File/FileSave");
+	menu_item_cut    = menu_get_widget("/MenuBar/Edit/EditCut");
+	menu_item_copy   = menu_get_widget("/MenuBar/Edit/EditCopy");
+	menu_item_paste  = menu_get_widget("/MenuBar/Edit/EditPaste");
+	menu_item_delete = menu_get_widget("/MenuBar/Edit/EditDelete");
 	menu_sensitivity_from_selection_bound(FALSE);
-	
-	return gtk_item_factory_get_widget(ifactory, "<main>");
+
+	return menu_get_widget("/MenuBar");
 }

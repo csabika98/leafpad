@@ -260,14 +260,14 @@ gint create_gnomeprint_session(void)
 	
 	dialog = gnome_print_dialog_new(job, (guchar *)_("Print"), 0);
 	notebook = gtk_container_get_children(
-		GTK_CONTAINER(GTK_DIALOG(dialog)->vbox))->data;
+		GTK_CONTAINER(gtk_dialog_get_content_area(GTK_DIALOG(dialog))))->data;
 	gtk_widget_hide(notebook);
-	if (!GTK_WIDGET_VISIBLE(gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook), page_num)))
+	if (!gtk_widget_get_visible(gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook), page_num)))
 		page_num++;
 	page = gtk_widget_ref(
 		gtk_notebook_get_nth_page(GTK_NOTEBOOK(notebook), page_num));
 	gtk_notebook_remove_page(GTK_NOTEBOOK(notebook), page_num);
-	gtk_box_pack_start(GTK_BOX(GTK_DIALOG(dialog)->vbox),
+	gtk_box_pack_start(GTK_BOX(gtk_dialog_get_content_area(GTK_DIALOG(dialog))),
 		page, FALSE, FALSE, 0);
 	gtk_widget_set_size_request(
 		gtk_container_get_children(GTK_CONTAINER(page))->data, -1, 240);
